@@ -251,3 +251,58 @@ class CompiledUserDictionary(Dictionary):
         compiledFST = _load(os.path.join(dic_dir, FILE_USER_FST_DATA))
         entries = pickle.loads(_load(os.path.join(dic_dir, FILE_USER_ENTRIES_DATA)))
         return compiledFST, entries
+
+
+class CloudStorageDictionary(Dictionary):
+
+    def __init__(self, user_dict, type, connections):
+        build_method = getattr(self, 'build' + type)
+        compiledFST, entries = build_method(user_dict)
+        Dictionary.__init__(self, compiledFST, entries, connections)
+
+    def buildipadic(self, user_dict):
+        import cloudstorage as gcs
+        surfaces = []
+        entries = {}
+        with gcs.open(user_dict[4:]) as f:
+            for line in f:
+                line = line.rstrip().decode("utf-8")
+                surface, left_id, right_id, cost, \
+                pos_major, pos_minor1, pos_minor2, pos_minor3, \
+                infl_type, infl_form, base_form, reading, phonetic = \
+                    line.split(',')
+                part_of_speech = ','.join([pos_major, pos_minor1, pos_minor2, pos_minor3])
+                morph_id = len(surfaces)
+                surfaces.append((surface.encode('utf8'), pack('I', morph_id)))
+                entries[morph_id] = (surface, int(left_id), int(right_id), int(cost), part_of_speech, infl_type, infl_form, base_form, reading, phonetic)
+        inputs = sorted(surfaces)  # inputs must be sorted.
+        assert len(surfaces) == len(entries)
+        fst = create_minimum_transducer(inputs)
+        compiledFST = compileFST(fst)
+        return compiledFST, entries
+
+    def buildsimpledic(self, user_dict):
+        import cloudstorage as gcs
+        surfaces = []
+        entries = {}
+        with gcs.open(user_dict[4:]) as f:
+            for line in f:
+                line = line.rstrip().decode("utf-8")
+                surface, pos_major, reading = line.split(',')
+                part_of_speech = ','.join([pos_major, u'*', u'*', u'*'])
+                morph_id = len(surfaces)
+                surfaces.append((surface.encode('utf8'), pack('I', morph_id)))
+                entries[morph_id] = (surface, 0, 0, -100000, part_of_speech, u'*', u'*', surface, reading, reading)
+        inputs = sorted(surfaces)  # inputs must be sorted.
+        assert len(surfaces) == len(entries)
+        fst = create_minimum_transducer(inputs)
+        compiledFST = compileFST(fst)
+        return compiledFST, entries
+
+    def save(self, to_dir, compressionlevel=9):
+        if os.path.exists(to_dir) and not os.path.isdir(to_dir):
+            raise Exception('Not a directory : %s' % to_dir)
+        elif not os.path.exists(to_dir):
+            os.makedirs(to_dir, mode=int('0755', 8))
+        _save(os.path.join(to_dir, FILE_USER_FST_DATA), self.compiledFST, compressionlevel)
+        _save(os.path.join(to_dir, FILE_USER_ENTRIES_DATA), pickle.dumps(self.entries), compressionlevel)

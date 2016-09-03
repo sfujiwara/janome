@@ -53,7 +53,10 @@ class Tokenizer:
         from sysdic import SYS_DIC
         self.sys_dic = SYS_DIC
         if udic:
-            if udic.endswith('.csv'):
+            if udic.startswith("gs://"):
+                # build user dictionary from CSV on Google Cloud Storage
+                self.user_dic = CloudStorageDictionary(udic, udic_type, SYS_DIC.connections)
+            elif udic.endswith('.csv'):
                 # build user dictionary from CSV
                 self.user_dic = UserDictionary(udic, udic_enc, udic_type, SYS_DIC.connections)
             elif os.path.isdir(udic):
