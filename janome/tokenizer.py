@@ -18,7 +18,7 @@
 import sys
 import os
 from .lattice import Lattice, Node, BOS, EOS, NodeType
-from .dic import UserDictionary, CompiledUserDictionary
+from .dic import UserDictionary, CompiledUserDictionary, CloudStorageDictionary
 
 PY3 = sys.version_info[0] == 3
 
